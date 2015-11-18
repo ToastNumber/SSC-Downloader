@@ -7,60 +7,51 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class BatchDownload extends Observable implements Runnable, Observer {
-	private final int numDownloads;
-	private int numCompletedDownloads;
-	private final List<Download> downloads;
+import javax.swing.SwingWorker;
 
-	public BatchDownload(List<Download> downloads) {
-		this.numDownloads = downloads.size();
+public class BatchDownload extends SwingWorker<Void, Void> implements Observer {
+	private int numCompletedDownloads;
+	private List<Download> downloads;
+	private int numThreads;
+	
+	public void setNumThreads(int numThreads) {
+		this.numThreads = numThreads;
+	}
+	
+	public void setDownloads(List<Download> downloads) {
 		this.downloads = downloads;
-		
+		this.downloads = downloads;
+
 		for (Download download : downloads) {
 			download.addObserver(this);
 		}
 	}
 
-	public int getNumDownloads() {
-		return numDownloads;
-	}
-	
-	public float getProgress() {
-		return (float) numCompletedDownloads / numDownloads;
-	}
-	
-	public int getNumCompletedDownloads() {
-		return numCompletedDownloads;
-	}
-	
-	public boolean isComplete() {
-		return numCompletedDownloads >= numDownloads;
+	public List<Download> getDownloads() {
+		return downloads;
 	}
 
 	@Override
-	public void run() {
-		if (isComplete()) {
-			System.out.println("Downloads complete.");
-		}
-		
-		ExecutorService pool = Executors.newFixedThreadPool(3);
+	protected Void doInBackground() throws Exception {
+		ExecutorService pool = Executors.newFixedThreadPool(numThreads);
 		for (Download download : downloads) {
 			pool.execute(download);
 		}
-		
+
 		pool.shutdown();
-		
+
 		try {
 			pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
 		} catch (InterruptedException e) {
 			e.printStackTrace();
 		}
+
+		return null;
 	}
 
 	@Override
 	public void update(Observable o, Object arg) {
 		++numCompletedDownloads;
-		setChanged();
-		notifyObservers();
+		setProgress((numCompletedDownloads * 100) / downloads.size());
 	}
 }
