@@ -66,6 +66,8 @@ public class KDownloader extends JFrame {
 	private JLabel lblExtensions;
 	private JPanel pnlUserControl;
 	private JCheckBox chckbxZIP;
+	private JCheckBox chckbxPDF;
+	private JButton btnSelectAll;
 
 	/**
 	 * Create the frame.
@@ -83,11 +85,11 @@ public class KDownloader extends JFrame {
 		pnlOptions = new JPanel();
 		contentPane.add(pnlOptions, BorderLayout.NORTH);
 		pnlOptions.setLayout(new GridLayout(3, 1, 0, 0));
-		
+
 		pnlExtensionControl = new JPanel();
 		pnlOptions.add(pnlExtensionControl);
 		pnlExtensionControl.setLayout(new BorderLayout(0, 0));
-		
+
 		lblExtensions = new JLabel("Extensions: ");
 		pnlExtensionControl.add(lblExtensions, BorderLayout.WEST);
 
@@ -109,11 +111,27 @@ public class KDownloader extends JFrame {
 		chckbxTXT.setFocusable(false);
 		pnlExtensions.add(chckbxTXT);
 		extensionBoxes.add(chckbxTXT);
-		
+
+		chckbxPDF = new JCheckBox("pdf");
+		chckbxPDF.setFocusable(false);
+		pnlExtensions.add(chckbxPDF);
+		extensionBoxes.add(chckbxPDF);
+
 		chckbxZIP = new JCheckBox(".zip");
 		chckbxZIP.setFocusable(false);
 		pnlExtensions.add(chckbxZIP);
 		extensionBoxes.add(chckbxZIP);
+
+		btnSelectAll = new JButton("Select All");
+		btnSelectAll.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				for (int i = 0; i < extensionBoxes.size(); ++i) {
+					extensionBoxes.get(i).setSelected(true);
+				}
+			}
+		});
+		btnSelectAll.setFocusable(false);
+		pnlExtensions.add(btnSelectAll);
 
 		pnlDest = new JPanel();
 		pnlOptions.add(pnlDest);
@@ -137,16 +155,16 @@ public class KDownloader extends JFrame {
 						final JFileChooser fc = new JFileChooser(System.getProperty("user.dir"));
 						fc.setMultiSelectionEnabled(false);
 						fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-						
+
 						int option = fc.showOpenDialog(null);
-						
+
 						if (option == JFileChooser.APPROVE_OPTION) {
 							File file = fc.getSelectedFile();
 							fldDest.setText(file.getAbsolutePath());
 						}
 					}
 				});
-			
+
 				t.start();
 			}
 		});
@@ -173,32 +191,32 @@ public class KDownloader extends JFrame {
 		pnlControl = new JPanel();
 		contentPane.add(pnlControl, BorderLayout.SOUTH);
 		pnlControl.setLayout(new BorderLayout(0, 0));
-		
+
 		pnlUserControl = new JPanel();
 		pnlControl.add(pnlUserControl, BorderLayout.WEST);
 
 		btnStartDownload = new JButton("Start Download");
 		pnlUserControl.add(btnStartDownload);
 		btnStartDownload.setFocusable(false);
-		
+
 		lblNoThreads = new JLabel("No. threads");
 		pnlUserControl.add(lblNoThreads);
-		
-				sldrNumThreads = new JSlider();
-				pnlUserControl.add(sldrNumThreads);
-				sldrNumThreads.setMajorTickSpacing(1);
-				sldrNumThreads.setSnapToTicks(true);
-				sldrNumThreads.setPaintTicks(true);
-				sldrNumThreads.setPaintLabels(true);
-				sldrNumThreads.setMinimum(1);
-				sldrNumThreads.setMaximum(10);
-				sldrNumThreads.setValue(3);
-		
-				btnStartDownload.addActionListener(new ActionListener() {
-					public void actionPerformed(ActionEvent e) {
-						startDownload();
-					}
-				});
+
+		sldrNumThreads = new JSlider();
+		pnlUserControl.add(sldrNumThreads);
+		sldrNumThreads.setMajorTickSpacing(1);
+		sldrNumThreads.setSnapToTicks(true);
+		sldrNumThreads.setPaintTicks(true);
+		sldrNumThreads.setPaintLabels(true);
+		sldrNumThreads.setMinimum(1);
+		sldrNumThreads.setMaximum(10);
+		sldrNumThreads.setValue(3);
+
+		btnStartDownload.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				startDownload();
+			}
+		});
 
 		progressBar = new JProgressBar(0, 100);
 		progressBar.setStringPainted(true);
@@ -292,7 +310,7 @@ public class KDownloader extends JFrame {
 					lblInfo.setForeground(Color.RED);
 					lblInfo.setText("Failed. Please try again.");
 					e.printStackTrace();
-				} 
+				}
 
 			}
 		});
