@@ -9,28 +9,47 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Observable;
+import java.util.concurrent.Callable;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-public class Download extends Observable implements Runnable {
+/**
+ * Represents an individual download of a file. The future object returns true
+ * if the download is successful; false otherwise.
+ * 
+ * @author Kelsey McKenna
+ *
+ */
+public class Download implements Callable<Boolean> {
 	private final URL url;
 	private File dest;
 	private boolean running = false;
 	private boolean complete = false;
 
+	/**
+	 * @param url
+	 *            the URL of the file to download
+	 * @param destDir
+	 *            the destination for the download
+	 */
 	public Download(URL url, File destDir) {
 		this.url = url;
 		this.dest = new File(destDir.getAbsolutePath() + File.separator + Link.getFileName(url));
 	}
 
+	/**
+	 * @return whether or not this download is running
+	 */
 	public boolean isRunning() {
 		return running;
 	}
 
+	/**
+	 * @return whether or not this download is complete
+	 */
 	public boolean isComplete() {
 		return complete;
 	}
@@ -40,6 +59,17 @@ public class Download extends Observable implements Runnable {
 		return Link.getFileName(url);
 	}
 
+	/**
+	 * Parses the webpage at the given URL and extracts the links which have an
+	 * extension matching some extension in <code>extensions</code>.
+	 * 
+	 * @param url
+	 *            the url of the webpage to parse
+	 * @param extensions
+	 *            the list of extensions to find
+	 * @return the list of URLs of the files with the specified extensions
+	 * @throws IOException
+	 */
 	public static List<URL> getDownloadLinks(String url, List<String> extensions) throws IOException {
 		// Try and parse the url before passing it to Jsoup
 		new URL(url);
@@ -47,18 +77,17 @@ public class Download extends Observable implements Runnable {
 		Document doc = Jsoup.connect(url).get();
 
 		List<URL> svar = new ArrayList<>();
-		
+
 		for (String ext : extensions) {
-			System.out.println("extension");
 			Elements links = doc.select(String.format("[src$=.%s]", ext));
-			
+
 			for (Element link : links) {
 				svar.add(new URL(link.attr("abs:src")));
 			}
-			
+
 			// Now go through href
 			links = doc.select(String.format("[href$=.%s]", ext));
-			
+
 			for (Element link : links) {
 				svar.add(new URL(link.attr("abs:href")));
 			}
@@ -67,7 +96,17 @@ public class Download extends Observable implements Runnable {
 		return svar;
 	}
 
-	private void writeFile(InputStream is, OutputStream os) throws IOException, InterruptedException {
+	/**
+	 * Many thanks to Dr Shan He for this code.
+	 * 
+	 * @param is
+	 *            the input stream for the file
+	 * @param os
+	 *            the output stream for the file
+	 * @throws IOException
+	 * @throws InterruptedException
+	 */
+	private void writeFile(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[512]; // optimize the size of buffer to your need
 		int num;
 		while ((num = is.read(buf)) != -1) {
@@ -75,11 +114,14 @@ public class Download extends Observable implements Runnable {
 		}
 
 		setState("complete");
-
-		setChanged();
-		notifyObservers();
 	}
 
+	/**
+	 * Set the state of this download
+	 * 
+	 * @param state
+	 *            either "complete" or "running"
+	 */
 	private void setState(String state) {
 		if (state.equals("complete")) {
 			complete = true;
@@ -90,6 +132,15 @@ public class Download extends Observable implements Runnable {
 		} else throw new IllegalArgumentException("Illegal state");
 	}
 
+	/**
+	 * Generate a list of downloads from the list of URLs.
+	 * 
+	 * @param urls
+	 *            the URLs of the files to download
+	 * @param destDir
+	 *            the destination location for the downloads.
+	 * @return the list of downloads represented by the URLs.
+	 */
 	public static List<Download> getDownloadList(List<URL> urls, File destDir) {
 		List<Download> svar = new ArrayList<>();
 
@@ -101,21 +152,31 @@ public class Download extends Observable implements Runnable {
 	}
 
 	@Override
-	public void run() {
+	public Boolean call() throws Exception {
 		setState("running");
 
 		InputStream in;
 		try {
+			// Open an input stream to the file
 			in = url.openStream();
+			// Open the output stream
 			OutputStream out = new BufferedOutputStream(new FileOutputStream(dest.getAbsolutePath()));
 
+			// Write the contents to file
 			writeFile(in, out);
+
+			// Close the streams
 			out.close();
 			in.close();
+
+			// Return true since the download completes fine.
+			return true;
 		} catch (IOException e) {
 			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
 		}
+
+		// Return false since the download did not complete fine.
+		return false;
 	}
+
 }

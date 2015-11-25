@@ -4,13 +4,13 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -30,9 +30,16 @@ import javax.swing.JSlider;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker.StateValue;
 import javax.swing.border.EmptyBorder;
-import java.awt.Font;
 
+/**
+ * A GUI which allows the user to download files from a specified website to a
+ * specified folder.
+ * 
+ * @author Kelsey McKenna
+ *
+ */
 public class KDownloader extends JFrame {
 
 	private JPanel contentPane;
@@ -149,16 +156,23 @@ public class KDownloader extends JFrame {
 		btnOpenFolder.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
+				// Set up a thread so that the program doesn't freeze when 'Open
+				// Folder' button is pressed.
 				Thread t = new Thread(new Runnable() {
 					@Override
 					public void run() {
 						final JFileChooser fc = new JFileChooser(System.getProperty("user.dir"));
+						// Only allow a single directory to be selected.
 						fc.setMultiSelectionEnabled(false);
 						fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
 
+						// Show the dialog
 						int option = fc.showOpenDialog(null);
 
+						// If the user selected a directory and clicked 'Open'
 						if (option == JFileChooser.APPROVE_OPTION) {
+							// Then set the text of the field to the selected
+							// directory.
 							File file = fc.getSelectedFile();
 							fldDest.setText(file.getAbsolutePath());
 						}
@@ -241,27 +255,45 @@ public class KDownloader extends JFrame {
 		setVisible(true);
 	}
 
-	private BatchDownload genBatchDownload() {
-		BatchDownload svar = new BatchDownload();
+	/**
+	 * @return a freshly generated batch downloader.
+	 */
+	private BatchDownload genBatchDownload(List<Download> downloads, int numThreads) {
+		BatchDownload svar = new BatchDownload(downloads, numThreads);
 
+		// Check when the batch download completes a new download
 		svar.addPropertyChangeListener(new PropertyChangeListener() {
 			@Override
 			public void propertyChange(PropertyChangeEvent evt) {
+				// If the batch downloader has progressed
 				if (evt.getPropertyName().equals("progress")) {
 					int val = (Integer) evt.getNewValue();
-
-					progressBar.setValue(val);
-					if (val >= 100) {
-						lblInfo.setText("Complete");
-					}
 
 					SwingUtilities.invokeLater(new Runnable() {
 						@Override
 						public void run() {
+							// Set the progress bar to the associated amount of
+							// progress.
+							progressBar.setValue(val);
+
+							if (val >= 100) {
+								lblInfo.setText("Complete");
+							}
+
+							// Refresh the list of downloads
 							refreshList();
 						}
 					});
-
+				} else if (evt.getPropertyName().equals("state")) {
+					StateValue state = (StateValue) evt.getNewValue();
+					if (state.equals(StateValue.DONE)) {
+						SwingUtilities.invokeLater(new Runnable() {
+							@Override
+							public void run() {
+								btnStartDownload.setEnabled(true);
+							}
+						});
+					}
 				}
 			}
 		});
@@ -269,6 +301,9 @@ public class KDownloader extends JFrame {
 		return svar;
 	}
 
+	/**
+	 * Clear the list of downloads, then add them all again.
+	 */
 	private void refreshList() {
 		model.clear();
 		for (Download download : batchDownload.getDownloads()) {
@@ -276,66 +311,106 @@ public class KDownloader extends JFrame {
 		}
 	}
 
+	/**
+	 * Start downloading the files specified by the user's input
+	 */
 	private void startDownload() {
-		// btnStartDownload.setEnabled(false);;
+		// Disable the start download button
+		btnStartDownload.setEnabled(false);
 
+		// Create a thread to run the downloads and send updates for the GUI.
 		Thread t1 = new Thread(new Runnable() {
 			@Override
 			public void run() {
 				List<URL> downloadURLs;
 
-				batchDownload = genBatchDownload();
-
 				try {
-					lblInfo.setForeground(Color.BLUE);
-					lblInfo.setText("Loading web page ...");
+					// Change the info label to show "Loading web page"
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							lblInfo.setForeground(Color.BLUE);
+							lblInfo.setText("Loading web page ...");
+						}
+					});
 
+					// Get the download URLs.
 					downloadURLs = Download.getDownloadLinks(fldWebpage.getText(), getExtensions());
+					// Create a list of download objects from these URLs
 					List<Download> downloads = Download.getDownloadList(downloadURLs, new File(fldDest.getText()));
 
-					batchDownload.setNumThreads(sldrNumThreads.getValue());
-					batchDownload.setDownloads(downloads);
+					// Use the specified number of threads for the batch
+					// downloader, and the specified downloads
+					batchDownload = genBatchDownload(downloads, sldrNumThreads.getValue());
 					batchDownload.execute();
 
-					if (downloads.size() > 0) {
-						lblInfo.setText("Downloading files ...");
-					} else {
-						lblInfo.setText("No files found with specified extensions.");
-					}
+					// Update the info label
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							if (downloads.size() > 0) {
+								lblInfo.setText("Downloading files ...");
+							} else {
+								lblInfo.setText("No files found with specified extensions.");
+							}
+						}
+					});
 				} catch (SocketTimeoutException e) {
-					lblInfo.setForeground(Color.BLUE);
-					lblInfo.setText("Connection timeout. Trying again ...");
+					// Update the info label to indicate a connection timeout.
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							lblInfo.setForeground(Color.BLUE);
+							lblInfo.setText("Connection timeout. Trying again ...");
+						}
+					});
+
+					// Restart the download
 					startDownload();
 				} catch (Exception e) {
-					lblInfo.setForeground(Color.RED);
-					lblInfo.setText("Failed. Please try again.");
+					// Update the info label to indicate that the operation
+					// failed.
+					SwingUtilities.invokeLater(new Runnable() {
+						@Override
+						public void run() {
+							lblInfo.setForeground(Color.RED);
+							lblInfo.setText("Failed. Please try again.");
+						}
+					});
 					e.printStackTrace();
 				}
 
 			}
 		});
 
-		t1.start();
+		// Wipe the visible list of downloads
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
 				model.clear();
 			}
 		});
+
+		t1.start();
 	}
 
+	/**
+	 * @return the list of selected extensions
+	 */
 	private List<String> getExtensions() {
 		List<String> svar = new ArrayList<>();
 		for (JCheckBox checkBox : extensionBoxes) {
 			String text = checkBox.getText();
 
+			// If the checkbox is selected, get the name of the extension, e.g.
+			// if the extension shows ".jpg" then grab "jpg"
 			if (checkBox.isSelected()) svar.add(text.substring(text.lastIndexOf(".") + 1));
 		}
 
 		return svar;
 	}
 
-	public static void main(String[] args) throws IOException, InterruptedException {
+	public static void main(String[] args) {
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
