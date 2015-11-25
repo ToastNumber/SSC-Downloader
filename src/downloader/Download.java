@@ -68,7 +68,7 @@ public class Download implements Callable<Boolean> {
 	 * @param extensions
 	 *            the list of extensions to find
 	 * @return the list of URLs of the files with the specified extensions
-	 * @throws IOException
+	 * @throws IOException a connection cannot be established
 	 */
 	public static List<URL> getDownloadLinks(String url, List<String> extensions) throws IOException {
 		// Try and parse the url before passing it to Jsoup
@@ -103,8 +103,7 @@ public class Download implements Callable<Boolean> {
 	 *            the input stream for the file
 	 * @param os
 	 *            the output stream for the file
-	 * @throws IOException
-	 * @throws InterruptedException
+	 * @throws IOException in case the connection fails
 	 */
 	private void writeFile(InputStream is, OutputStream os) throws IOException {
 		byte[] buf = new byte[512]; // optimize the size of buffer to your need

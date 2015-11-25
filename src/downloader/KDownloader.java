@@ -256,6 +256,8 @@ public class KDownloader extends JFrame {
 	}
 
 	/**
+	 * @param downloads the downloads to be performed in this batch download
+	 * @param numThreads the number of threads to be used when downloading
 	 * @return a freshly generated batch downloader.
 	 */
 	private BatchDownload genBatchDownload(List<Download> downloads, int numThreads) {
